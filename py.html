@@ -26,7 +26,7 @@
       }
 
       try {
-        const res = await fetch(`https://init-paypal.alexskeioslav.workers.dev/get?ref=${ref}`);
+        const res = await fetch(`https://apps-init-paypal.alexskeioslav.workers.dev/get?ref=${ref}`);
         if (!res.ok) {
           alert("❌ Failed to retrieve payment data.");
           return null;
@@ -93,10 +93,12 @@
             transactionId,
             paid_at: paidAt,
             Country: formattedCountry,
-            Payment_Method: "PayPal"
+            Payment_Method: "PayPal",
+            Payment_Table: paymentData.Payment_Table,
+            Payment_Token: paymentData.Payment_Token
           };
 
-          fetch("https://omp-subscription-handler.alexskeioslav.workers.dev/", {
+          fetch("https://apps-subscription-handler.alexskeioslav.workers.dev/", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
