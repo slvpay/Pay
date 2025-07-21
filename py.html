@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Checkout with PayPal</title>
+  <style>
+    body {
+      padding: 20px;
+      display: none;
+    }
+    h1 {
+      text-align: center;
+    }
+  </style>
+  <script>
+    const PAYPAL_SCRIPT_URL = "https://www.paypal.com/sdk/js";
+
+    async function getPaymentData() {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+
+      if (!ref) {
+        alert("Missing reference.");
+        return null;
+      }
+
+      try {
+        const res = await fetch(`https://init-paypal.alexskeioslav.workers.dev/get?ref=${ref}`);
+        if (!res.ok) {
+          alert("❌ Failed to retrieve payment data.");
+          return null;
+        }
+        const data = await res.json();
+
+        // Validate
+        if (!data.email || !data.Client_Id || !data.Plan_Name || !data.Plan_Cost) {
+          alert("❌ Incomplete payment data.");
+          return null;
+        }
+
+        return { ...data, ref };
+      } catch (err) {
+        console.error("Error fetching payment data:", err);
+        alert("❌ Error loading payment info.");
+        return null;
+      }
+    }
+
+    let paymentData = null;
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      paymentData = await getPaymentData();
+      if (!paymentData) return;
+
+      document.body.style.display = "block";
+      document.getElementById("plan-name").textContent = paymentData.Plan_Name;
+      document.getElementById("cost").textContent = paymentData.Plan_Cost;
+
+      const script = document.createElement("script");
+      script.src = `${PAYPAL_SCRIPT_URL}?client-id=${paymentData.Client_Id}`;
+      script.onload = loadPayPalButtons;
+      document.body.appendChild(script);
+    });
+
+    function loadPayPalButtons() {
+      paypal.Buttons({
+        createOrder: (data, actions) => {
+          return actions.order.create({
+            purchase_units: [{
+              amount: {
+                value: paymentData.Plan_Cost,
+                currency_code: "USD"
+              }
+            }],
+            application_context: {
+              shipping_preference: "NO_SHIPPING"
+            }
+          });
+        },
+        onApprove: async (data, actions) => {
+          const details = await actions.order.capture();
+          const transactionId = details.id;
+          const paidAt = new Date().toISOString();
+          const formattedCountry = `${paymentData.Country} (${paymentData.Country_Code})`;
+
+          const payload = {
+            email: paymentData.email,
+            Plan_Name: paymentData.Plan_Name,
+            Plan_Cost: `$${paymentData.Plan_Cost}`,
+            Plan_Expiry: paymentData.Plan_Expiry,
+            abbreviation: paymentData.abbreviation,
+            transactionId,
+            paid_at: paidAt,
+            Country: formattedCountry,
+            Payment_Method: "PayPal"
+          };
+
+          fetch("https://omp-subscription-handler.alexskeioslav.workers.dev/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          })
+          .then(() => {
+            alert("✅ Payment successful! You can now return to the app.");
+          })
+          .catch(() => {
+            alert("Payment failed.");
+          });
+        }
+      }).render("#paypal-button-container");
+    }
+  </script>
+</head>
+<body>
+  <h1>Complete Checkout</h1>
+  <p style="text-align: center;">
+    Plan: <strong><span id="plan-name"></span></strong> -
+    Cost: <strong>$<span id="cost"></span></strong>
+  </p>
+  <div id="paypal-button-container"></div>
+</body>
+</html>
