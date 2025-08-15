@@ -26,20 +26,26 @@
       }
 
       try {
-        const res = await fetch(`https://apps-init-paypal.alexskeioslav.workers.dev/get?ref=${ref}`);
+        // Fetch only non-sensitive data from backend
+        const res = await fetch(`https://apps-init-paypal.alexskeioslav.workers.dev/get-minimal?ref=${ref}`);
         if (!res.ok) {
           alert("❌ Failed to retrieve payment data.");
           return null;
         }
         const data = await res.json();
 
-        // Validate
-        if (!data.email || !data.Client_Id || !data.Plan_Name || !data.Plan_Cost) {
+        // Validate minimal fields needed for this page
+        if (!data.Client_Id || !data.Plan_Name || !data.Plan_Cost) {
           alert("❌ Incomplete payment data.");
           return null;
         }
 
-        return { ...data, ref };
+        return { 
+          ref, 
+          Client_Id: data.Client_Id, 
+          Plan_Name: data.Plan_Name, 
+          Plan_Cost: data.Plan_Cost 
+        };
       } catch (err) {
         console.error("Error fetching payment data:", err);
         alert("❌ Error loading payment info.");
@@ -81,35 +87,23 @@
         onApprove: async (data, actions) => {
           const details = await actions.order.capture();
           const transactionId = details.id;
-          const paidAt = new Date().toISOString();
-          const formattedCountry = `${paymentData.Country} (${paymentData.Country_Code})`;
 
-          const payload = {
-            email: paymentData.email,
-            Plan_Name: paymentData.Plan_Name,
-            Plan_Cost: `$${paymentData.Plan_Cost}`,
-            Plan_Expiry: paymentData.Plan_Expiry,
-            abbreviation: paymentData.abbreviation,
-            transactionId,
-            paid_at: paidAt,
-            Country: formattedCountry,
-            Payment_Method: "PayPal",
-            Payment_Table: paymentData.Payment_Table,
-            Payment_Token: paymentData.Payment_Token
-          };
-
-          fetch("https://apps-subscription-handler.alexskeioslav.workers.dev/", {
+          // Send only ref and transactionId to your new worker
+          fetch("https://paypal-payment-handler.alexskeioslav.workers.dev/", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+              ref: paymentData.ref,
+              transactionId: transactionId
+            })
           })
           .then(() => {
             alert("✅ Payment successful! You can now return to the app.");
           })
           .catch(() => {
-            alert("Payment failed.");
+            alert("❌ Failed to send payment confirmation.");
           });
         }
       }).render("#paypal-button-container");
