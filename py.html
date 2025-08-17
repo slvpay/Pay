@@ -86,7 +86,14 @@
         },
         onApprove: async (data, actions) => {
           const details = await actions.order.capture();
-          const transactionId = details.id;
+          // Get capture ID
+          const captureId = details.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+
+          if (!captureId) {
+            alert("❌ Payment captured, but no Capture ID found. Storing Order ID instead.");
+          }
+          // Send Capture ID if available, otherwise fallback to Order ID
+          const transactionId = captureId || details.id;
 
           // Send only ref and transactionId to your new worker
           fetch("https://paypal-payment-handler.alexskeioslav.workers.dev/", {
