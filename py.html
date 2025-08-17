@@ -90,7 +90,7 @@
           const captureId = details.purchase_units?.[0]?.payments?.captures?.[0]?.id;
 
           if (!captureId) {
-            alert("❌ Payment captured, but no Capture ID found. Storing Order ID instead.");
+            alert("❌ Payment captured, but no Capture ID found");
           }
           // Send Capture ID if available, otherwise fallback to Order ID
           const transactionId = captureId || details.id;
@@ -107,8 +107,10 @@
             })
           })
           .then(() => {
-            alert("✅ Payment successful! You can now return to the app.");
-          })
+  document.getElementById("paypal-button-container").innerHTML = 
+    "<p style='text-align:center; color:green;'>✅ Payment successful! You can now return to the app.</p>";
+})
+
           .catch(() => {
             alert("❌ Failed to send payment confirmation.");
           });
