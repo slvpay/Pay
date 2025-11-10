@@ -29,22 +29,26 @@
         // Fetch only non-sensitive data from backend
         const res = await fetch(`https://apps-init-paypal.alexskeioslav.workers.dev/get-minimal?ref=${ref}`);
         if (!res.ok) {
-          alert("❌ Failed to retrieve payment data.");
+          alert("❌ Payment expired.");
           return null;
         }
         const data = await res.json();
 
         // Validate minimal fields needed for this page
         if (!data.Client_Id || !data.Plan_Name || !data.Plan_Cost) {
-          alert("❌ Incomplete payment data.");
+          alert("❌ Payment expired");
           return null;
         }
+
+        // Include Country_Code with fallback
+        const Country_Code = data.Country_Code && data.Country_Code.trim() !== "" ? data.Country_Code : "US";
 
         return { 
           ref, 
           Client_Id: data.Client_Id, 
           Plan_Name: data.Plan_Name, 
-          Plan_Cost: data.Plan_Cost 
+          Plan_Cost: data.Plan_Cost,
+          Country_Code
         };
       } catch (err) {
         console.error("Error fetching payment data:", err);
@@ -79,7 +83,12 @@
                 currency_code: "USD"
               }
             }],
-            application_context: {
+            payer: {
+          address: {
+            country_code: Country_Code
+          }
+        },
+        application_context: {
               shipping_preference: "NO_SHIPPING"
             }
           });
@@ -90,7 +99,7 @@
           const captureId = details.purchase_units?.[0]?.payments?.captures?.[0]?.id;
 
           if (!captureId) {
-            alert("❌ Payment captured, but no Capture ID found");
+            alert("❌ Payment captured, but an error occurred");
           }
           // Send Capture ID if available, otherwise fallback to Order ID
           const transactionId = captureId || details.id;
